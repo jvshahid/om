@@ -153,8 +153,7 @@ var _ = Describe("ResponsePropertyCollection", func() {
 			]`))
 			Expect(err).To(BeNil())
 
-			key, ok := collection[0].findLogicalKeyField()
-			Expect(ok).To(BeTrue())
+			key := collection[0].findLogicalKeyField()
 			Expect(key).To(Equal("name"))
 		})
 		It("fails to find a logical key when there isn't one", func() {
@@ -178,8 +177,7 @@ var _ = Describe("ResponsePropertyCollection", func() {
 			]`))
 			Expect(err).To(BeNil())
 
-			key, ok := collection[0].findLogicalKeyField()
-			Expect(ok).To(BeFalse())
+			key := collection[0].findLogicalKeyField()
 			Expect(key).To(BeEmpty())
 		})
 
@@ -211,8 +209,7 @@ var _ = Describe("ResponsePropertyCollection", func() {
 			]`))
 			Expect(err).To(BeNil())
 
-			key, ok := collection[0].findLogicalKeyField()
-			Expect(ok).To(BeTrue())
+			key := collection[0].findLogicalKeyField()
 			Expect(key).To(Equal("key"))
 		})
 		It("finds a logical key ending in 'name'", func() {
@@ -243,8 +240,7 @@ var _ = Describe("ResponsePropertyCollection", func() {
 			]`))
 			Expect(err).To(BeNil())
 
-			key, ok := collection[0].findLogicalKeyField()
-			Expect(ok).To(BeTrue())
+			key := collection[0].findLogicalKeyField()
 			Expect(key).To(Equal("sqlServerName"))
 		})
 		It("picks 'name' as the logical key when there is a 'name' field AND a field that ends in 'name' (eg: Filename)", func() {
@@ -275,8 +271,7 @@ var _ = Describe("ResponsePropertyCollection", func() {
 			]`))
 			Expect(err).To(BeNil())
 
-			key, ok := collection[0].findLogicalKeyField()
-			Expect(ok).To(BeTrue())
+			key := collection[0].findLogicalKeyField()
 			Expect(key).To(Equal("name"))
 		})
 	})
