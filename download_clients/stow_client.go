@@ -1,10 +1,12 @@
 package download_clients
 
 import (
+	"context"
 	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/graymeta/stow"
 	"github.com/pivotal-cf/om/extractor"
-	"github.com/cheggaaa/pb/v3"
+	"gocloud.dev/blob"
 	"io"
 	"log"
 	"os"
@@ -14,42 +16,25 @@ import (
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
-//counterfeiter:generate -o ./fakes/config_service.go --fake-name Config . StowConfiger
-type StowConfiger interface {
-	Config(name string) (string, bool)
-	Set(name, value string)
-}
-
-type Stower interface {
-	Dial(kind string, config StowConfiger) (stow.Location, error)
-	Walk(container stow.Container, prefix string, pageSize int, fn stow.WalkFunc) error
-}
-
-type StowWrapper struct{}
-
-func (d StowWrapper) Dial(kind string, config StowConfiger) (stow.Location, error) {
-	location, err := stow.Dial(kind, config)
-	return location, err
-}
-func (d StowWrapper) Walk(container stow.Container, prefix string, pageSize int, fn stow.WalkFunc) error {
-	return stow.Walk(container, prefix, pageSize, fn)
+//counterfeiter:generate -o ./fakes/storer_service.go --fake-name Storer . Storer
+type Storer interface {
+	NewReader(ctx context.Context, key string, opts *blob.ReaderOptions) (*blob.Reader, error)
+	List(opts *blob.ListOptions) *blob.ListIterator
 }
 
 type stowClient struct {
-	stower       Stower
+	storer       Storer
 	bucket       string
-	Config       stow.Config
 	productPath  string
 	stemcellPath string
 	kind         string
 	stderr       *log.Logger
 }
 
-func NewStowClient(stower Stower, stderr *log.Logger, config stow.ConfigMap, productPath string, stemcellPath string, kind string, bucket string) stowClient {
+func NewStowClient(storer Storer, stderr *log.Logger, config stow.ConfigMap, productPath string, stemcellPath string, kind string, bucket string) stowClient {
 	return stowClient{
-		stower:       stower,
+		storer:       storer,
 		bucket:       bucket,
-		Config:       config,
 		productPath:  productPath,
 		stemcellPath: stemcellPath,
 		kind:         kind,
@@ -99,22 +84,17 @@ func (s stowClient) getAllProductVersionsFromPath(slug, path string) ([]string, 
 }
 
 func (s *stowClient) listFiles() ([]string, error) {
-	container, err := s.getContainer()
-	if err != nil {
-		return nil, err
-	}
-
 	var paths []string
-	err = s.stower.Walk(container, stow.NoPrefix, 100, func(item stow.Item, err error) error {
-		if err != nil {
-			return err
+	iter := s.storer.List(&blob.ListOptions{})
+	for {
+		object, err := iter.Next(context.TODO())
+		if err == io.EOF {
+			break
 		}
-		paths = append(paths, item.ID())
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, object.Key)
 	}
 
 	if len(paths) == 0 {
@@ -124,30 +104,30 @@ func (s *stowClient) listFiles() ([]string, error) {
 	return paths, nil
 }
 
-func (s *stowClient) getContainer() (stow.Container, error) {
-	location, err := s.stower.Dial(s.kind, s.Config)
-	if err != nil {
-		return nil, err
-	}
-	container, err := location.Container(s.bucket)
-	if err != nil {
-		endpoint, _ := s.Config.Config("endpoint")
-		if endpoint != "" {
-			return nil, fmt.Errorf(
-				"could not reach provided endpoint and bucket '%s/%s': %s\nCheck bucket and endpoint configuration",
-				endpoint,
-				s.bucket,
-				err,
-			)
-		}
-		return nil, fmt.Errorf(
-			"could not reach provided bucket '%s': %s\nCheck bucket and endpoint configuration",
-			s.bucket,
-			err,
-		)
-	}
-	return container, nil
-}
+//func (s *stowClient) getContainer() (stow.Container, error) {
+//	location, err := s.stower.Dial(s.kind, s.Config)
+//	if err != nil {
+//		return nil, err
+//	}
+//	container, err := location.Container(s.bucket)
+//	if err != nil {
+//		endpoint, _ := s.Config.Config("endpoint")
+//		if endpoint != "" {
+//			return nil, fmt.Errorf(
+//				"could not reach provided endpoint and bucket '%s/%s': %s\nCheck bucket and endpoint configuration",
+//				endpoint,
+//				s.bucket,
+//				err,
+//			)
+//		}
+//		return nil, fmt.Errorf(
+//			"could not reach provided bucket '%s': %s\nCheck bucket and endpoint configuration",
+//			s.bucket,
+//			err,
+//		)
+//	}
+//	return container, nil
+//}
 
 func (s stowClient) GetLatestProductFile(slug, version, glob string) (FileArtifacter, error) {
 	files, err := s.listFiles()
@@ -218,22 +198,13 @@ func (s stowClient) DownloadProductToFile(fa FileArtifacter, destinationFile *os
 }
 
 func (s *stowClient) initializeBlobReader(filename string) (blobToRead io.ReadCloser, fileSize int64, err error) {
-	container, err := s.getContainer()
+	item, err := s.storer.NewReader(context.TODO(), filename, &blob.ReaderOptions{})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	item, err := container.Item(filename)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	fileSize, err = item.Size()
-	if err != nil {
-		return nil, 0, err
-	}
-	blobToRead, err = item.Open()
-	return blobToRead, fileSize, err
+	fileSize = item.Size()
+	return item, fileSize, nil
 }
 
 func (s stowClient) startProgressBar(size int64, item io.Reader) (*pb.ProgressBar, io.Reader) {

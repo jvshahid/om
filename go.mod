@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	cloud.google.com/go v0.60.0 // indirect
-	cloud.google.com/go/storage v1.8.0
+	cloud.google.com/go/storage v1.9.0
 	github.com/Azure/azure-sdk-for-go v43.3.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.0 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.3.0 // indirect
@@ -38,6 +38,7 @@ require (
 	github.com/sclevine/spec v1.4.0 // indirect
 	github.com/shirou/gopsutil v2.20.5+incompatible // indirect
 	go.opencensus.io v0.22.4 // indirect
+	gocloud.dev v0.20.0 // indirect
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect

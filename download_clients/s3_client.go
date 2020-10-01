@@ -2,7 +2,8 @@ package download_clients
 
 import (
 	"fmt"
-	"github.com/graymeta/stow"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/graymeta/stow/s3"
 	"gopkg.in/go-playground/validator.v9"
 	"log"
@@ -22,7 +23,7 @@ type S3Configuration struct {
 	AuthType        string
 }
 
-func NewS3Client(stower Stower, config S3Configuration, stderr *log.Logger) (stowClient, error) {
+func NewS3Client(config S3Configuration, stderr *log.Logger) (stowClient, error) {
 	validate := validator.New()
 	err := validate.Struct(config)
 	if err != nil {
@@ -40,17 +41,28 @@ func NewS3Client(stower Stower, config S3Configuration, stderr *log.Logger) (sto
 		return stowClient{}, err
 	}
 
-	stowConfig := stow.ConfigMap{
+	//stowConfig := stow.ConfigMap{
+	//	s3.ConfigAccessKeyID: config.AccessKeyID,
+	//	s3.ConfigSecretKey:   config.SecretAccessKey,
+	//	s3.ConfigRegion:      config.RegionName,
+	//	s3.ConfigEndpoint:    config.Endpoint,
+	//	s3.ConfigDisableSSL:  disableSSL,
+	//	s3.ConfigV2Signing:   enableV2Signing,
+	//	s3.ConfigAuthType:    config.AuthType,
+	//}
+
+	sess, err := session.NewSession(&aws.Config{
 		s3.ConfigAccessKeyID: config.AccessKeyID,
 		s3.ConfigSecretKey:   config.SecretAccessKey,
-		s3.ConfigRegion:      config.RegionName,
-		s3.ConfigEndpoint:    config.Endpoint,
-		s3.ConfigDisableSSL:  disableSSL,
-		s3.ConfigV2Signing:   enableV2Signing,
-		s3.ConfigAuthType:    config.AuthType,
-	}
+		Region:               aws.String(config.RegionName),
+		Endpoint:             aws.String(config.Endpoint),
+		DisableSSL:           aws.Bool(config.DisableSSL),
+		:   enableV2Signing,
+		auth:                 config.AuthType,
+	})
+	sess.Handlers.Sign.Sw
 
-	return NewStowClient(stower, stderr, stowConfig, config.ProductPath, config.StemcellPath, "s3", config.Bucket, ), nil
+	return NewStowClient(storer, stderr, stowConfig, config.ProductPath, config.StemcellPath, "s3", config.Bucket), nil
 }
 
 func validateAccessKeyAuthType(config S3Configuration) error {
